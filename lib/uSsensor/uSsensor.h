@@ -21,7 +21,7 @@ Richard Hosking Apr- Dec 2024
 #define DISTANCE_MAX 7500
 #define DISTANCE_MIN 280
 
-// Status codes - "last_operate_status" is defined in inherited class
+// Status codes - "last_operate_status" is defined in inherited SoftwareSerial class
 enum status_t
 {
   STA_OK = 0x00,

@@ -16,11 +16,7 @@
 #include "LowPower.h"
 #include "uSsensor.h"
 
-// supply power to US transducer via a pin on the arduino
-#define US_power 12
-// RTC pin
-#define RTC 2
-// Serial port pins
+// Software Serial port pins for US sensor
 #define Tx 10
 #define Rx 11
 
@@ -31,15 +27,36 @@ long BAUD = 9600;
 // Inverse flag for serial port
 bool inverse = false;
 
+// RTC interrupt on pin 2 
+const byte RTC = 2;
+
+// supply power to US transducer via a pin on the arduino
+// transducer takes about 15mA when powered up 
+const byte sensor_power = 4;
+
 // Declare instance of US sensor
 USsensor sensor(Tx,Rx, inverse);
 
-// ISR (Interrupt service routine) for RTC
-// Must have no parameters and no return
-// Cannot call Class members?
-void serviceRTC(void){
-  //Serial.println("RTC interrupt");
-  }
+// Instance of LowPowerClass
+// Seems to be declared implicitly
+
+// Interrupt Service Routine (ISR) for RTC
+void serviceRTC ()
+{
+  noInterrupts ();          // interrupts are disabled  
+  detachInterrupt (digitalPinToInterrupt (RTC)); // stop LOW interrupt on D2
+  digitalWrite (RTC, HIGH);  // 
+  interrupts ();           // interrupts allowed now, next instruction WILL be executed
+}  
+
+void sleepNow ()
+{
+  noInterrupts ();          // interrupts are disabled
+  attachInterrupt (digitalPinToInterrupt (RTC), serviceRTC, LOW);  // wake up on low level on D2
+  interrupts ();                                                   // interrupts allowed now, next instruction WILL be executed
+  LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);             // sleep indefinitely, ADC and Brown out detector off
+}  
+
 
 void setup(){
   // Start serial port to board for debugging purposes
@@ -49,8 +66,10 @@ void setup(){
 
 // Set up pins - hardware interrupt on pin 2 for RTC
  pinMode(RTC, INPUT);
- attachInterrupt(digitalPinToInterrupt(RTC), serviceRTC, CHANGE);
- 
+ digitalWrite (RTC, HIGH);
+  
+ pinMode (sensor_power, OUTPUT);
+  
 // "Tx" is the output from the transducer
 // "Rx" sets mode - when high the transducer outputs a "processed" value 
 // when low it outputs raw data
@@ -58,8 +77,8 @@ void setup(){
  pinMode(Rx, OUTPUT);
  // Set transducer mode to "processing"
  digitalWrite(Rx, HIGH);
-  // Looks like this transducer will only work at 9600 baud
-  // ser is a SoftwareSerial object in sensor
+
+ // Start Software Serial port
  sensor.begin(BAUD); 
  delay(300);
  if (sensor.ser.isListening()){
@@ -68,45 +87,81 @@ void setup(){
  else{
    Serial.println("Sensor not listening");
  }
-} 
-
-
+ delay(20);
+ Serial.print("Data in PCMSK0 register = ");
+ for (int8_t aBit = 7; aBit >= 0; aBit--){
+    Serial.write(bitRead(*digitalPinToPCMSK(Tx), aBit) ? '1' : '0');}
+ Serial.println();
+ Serial.print("Interrupt pin in PCMSK0 register for serial port pin Tx = ");
+ Serial.println(digitalPinToPCMSKbit(Tx));
+ Serial.print("Interrupt pin in PCMSK0 register for serial port pin Rx = ");
+ Serial.println(digitalPinToPCMSKbit(Rx));
+ Serial.print("Data in PCICR register = ");
+  for (int8_t aBit = 2; aBit >= 0; aBit--){
+      Serial.write(bitRead(*digitalPinToPCICR(Tx), aBit) ? '1' : '0');}
+ Serial.println();
+   
+ }
+  
 void loop()
-{
-    sensor.receiveFrame();
-    sensor.measure();
-    if (sensor.last_operate_status == STA_OK){
-      Serial.print("Distance = ");
-      Serial.print(sensor.distance);
-      Serial.println("mm");
+{  
+  // Processor has been woken up by external interrupt 
+  // Turn on US sensor
+  digitalWrite(sensor_power, HIGH);
+  // Allow time for sensor to wakeup and measure
+  delay(1000);
+  sensor.begin(BAUD); 
+  delay(300);
+  // Seem to need to clear buffer and then have a delay to work properly
+  sensor.clearBuffer();
+  delay(500);
+  sensor.receiveFrame();
+  sensor.measure();
+  if (sensor.last_operate_status == STA_OK) {
+    Serial.print("Distance = ");
+    Serial.print(sensor.distance);
+    Serial.println("mm");
+  }
+  else{
+    Serial.print("Error code = ");
+    if(sensor.last_operate_status == STA_ERR_CHECKSUM){
+      Serial.println("Checksum error");
+    }
+    else if(sensor.last_operate_status == STA_ERR_CHECK_LOW_LIMIT){
+      Serial.println("Below lower limit");
+    }
+    else if(sensor.last_operate_status == STA_ERR_CHECK_OUT_LIMIT){
+      Serial.println("Above upper limit");
+    }
+    else if(sensor.last_operate_status == STA_ERR_DATA){
+      Serial.println("Data error");
+    }
+    else if(sensor.last_operate_status == STA_ERR_SERIAL){
+      Serial.println("Serial error");
     }
     else{
-      Serial.print("Error code = ");
-      if(sensor.last_operate_status == STA_ERR_CHECKSUM){
-        Serial.println("Checksum error");
-      }
-      else if(sensor.last_operate_status == STA_ERR_CHECK_LOW_LIMIT){
-        Serial.println("Below lower limit");
-      }
-      else if(sensor.last_operate_status == STA_ERR_CHECK_OUT_LIMIT){
-        Serial.println("Above upper limit");
-      }
-      else if(sensor.last_operate_status == STA_ERR_DATA){
-        Serial.println("Data error");
-      }
-      else if(sensor.last_operate_status == STA_ERR_SERIAL){
-        Serial.println("Serial error");
-      }
-      else{
-        Serial.println("Unknown error");
-      }
+      Serial.println("Unknown error");
     }
-    
-    sensor.clearBuffer();
-  
-  
-delay(1000);
+  }
+ 
+Serial.println("Going to sleep");
+delay(100);  // delay to allow serial write to finish before sleep
+// Turn off US sensor
+digitalWrite(sensor_power, LOW);
 
+// stop data from sensor or software serial interrupts will prevent sleep mode
+sensor.clearBuffer();
+// Need to call method from inherited library
+sensor.ser.end();
+
+// need if to allow for RTC line still being low 
+if (digitalRead(RTC) == HIGH){
+  sleepNow();
+}
+delay(100);
+Serial.println("Woken Up");
+
+delay(2100);
 
 }
 

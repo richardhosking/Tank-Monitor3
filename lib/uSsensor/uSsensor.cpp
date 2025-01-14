@@ -71,6 +71,8 @@ int USsensor::measure()
     {
       last_operate_status = STA_ERR_DATA;
     }
+    newData = false;
+    
     if (last_operate_status == STA_OK)
     {
       return distance;
@@ -122,3 +124,4 @@ void USsensor::receiveFrame(){
       // Set flag to indicate new data is available       
       newData = true;
     }
+
