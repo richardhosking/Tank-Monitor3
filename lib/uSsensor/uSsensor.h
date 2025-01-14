@@ -1,7 +1,6 @@
 /*
-file USsensor.h
-@brief DFRobot_A02_Distance class
-Modified from the Python code as the Arduino C++ is not well documented
+@file USsensor.h
+Heavily modified from the Python code for the DFRobot sensor as the Arduino C++ is not well documented
 Richard Hosking Apr- Dec 2024
 @copyright   Copyright (c) 2010 DFRobot Co.Ltd (http://www.dfrobot.com)
 @license     The MIT License (MIT)

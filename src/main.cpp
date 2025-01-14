@@ -1,7 +1,6 @@
 /*
-  *@File  :  from DFRobot_Distance_A02.ino 
-  *
-  * Modified by Rchard Hosking Dec 2024
+  * Ultrasonic sensor example
+  * Modified by Rchard Hosking from Dec 2024
   * Tank water level monitor
   * Using DFRobot A01NYUB ultrasonic transducer
   * RTC unit to wake up processor periodically
@@ -88,19 +87,7 @@ void setup(){
    Serial.println("Sensor not listening");
  }
  delay(20);
- Serial.print("Data in PCMSK0 register = ");
- for (int8_t aBit = 7; aBit >= 0; aBit--){
-    Serial.write(bitRead(*digitalPinToPCMSK(Tx), aBit) ? '1' : '0');}
- Serial.println();
- Serial.print("Interrupt pin in PCMSK0 register for serial port pin Tx = ");
- Serial.println(digitalPinToPCMSKbit(Tx));
- Serial.print("Interrupt pin in PCMSK0 register for serial port pin Rx = ");
- Serial.println(digitalPinToPCMSKbit(Rx));
- Serial.print("Data in PCICR register = ");
-  for (int8_t aBit = 2; aBit >= 0; aBit--){
-      Serial.write(bitRead(*digitalPinToPCICR(Tx), aBit) ? '1' : '0');}
- Serial.println();
-   
+ 
  }
   
 void loop()
