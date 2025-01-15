@@ -1,5 +1,5 @@
 /*
-  * Ultrasonic sensor example
+  * Tank Monitor Code from Ultrasonic sensor example
   * Modified by Rchard Hosking from Dec 2024
   * Tank water level monitor
   * Using DFRobot A01NYUB ultrasonic transducer
@@ -19,6 +19,11 @@
 // Software Serial port pins for US sensor
 #define Tx 10
 #define Rx 11
+// RTC interrupt on pin 2 
+#define RTCint 2
+// supply power to US transducer via a pin on the arduino
+// transducer takes about 15mA when powered up 
+#define sensor_power 4
 
 // Distance variable
 float distance;
@@ -27,19 +32,12 @@ long BAUD = 9600;
 // Inverse flag for serial port
 bool inverse = false;
 
-// RTC interrupt on pin 2 
-const byte RTCint = 2;
-
-// supply power to US transducer via a pin on the arduino
-// transducer takes about 15mA when powered up 
-const byte sensor_power = 4;
-
 // Declare instance of US sensor
 USsensor sensor(Tx,Rx, inverse);
 
 // and RTC
 RV8803 rtc;
-//The below variables control what the date and time will be set to when set manually 
+//variables for date and time set manually 
 int sec = 2;
 int minute = 40;
 int hour = 10; //Set things in 24 hour mode
@@ -47,11 +45,11 @@ int date = 15;
 int month = 1;
 int year = 2025;
 int weekday = 3;
+// Clock ticks for interval timer
+// 1 minute between interrupts 15.625 mSec per tick
+long ticks = 3840;  
 
-long ticks = 3840;  // 1 minute between interrupts 15.625 mSec per tick
-
-// Instance of LowPowerClass
-// Seems to be declared implicitly
+// Instance of LowPowerClass seems to be declared implicitly
 
 // Interrupt Service Routine (ISR) for RTC
 void serviceRTC ()
@@ -69,7 +67,6 @@ void sleepNow ()
   interrupts ();                                                   // interrupts allowed now, next instruction WILL be executed
   LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);             // sleep indefinitely, ADC and Brown out detector off
 }  
-
 
 void setup(){
   // Start serial port to board for debugging purposes
@@ -191,7 +188,9 @@ void loop()
   }
  
 Serial.println("Going to sleep");
-delay(100);  // delay to allow serial write to finish before sleep
+// delay to allow serial write to finish before sleep
+delay(100);  
+
 // Turn off US sensor
 digitalWrite(sensor_power, LOW);
 
@@ -205,8 +204,6 @@ if (digitalRead(RTCint) == HIGH){
 }
 delay(100);
 Serial.println("Woken Up");
-
-//delay(2100);
 
 }
 
